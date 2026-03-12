@@ -19,7 +19,7 @@ Create an email draft. This is a **drafts-only** fork — all email composition 
 ## Usage
 
 ```bash
-gws gmail +draft --to <EMAILS> --subject <SUBJECT> --body <TEXT>
+gws gmail +draft [--profile <NAME>] --to <EMAILS> --subject <SUBJECT> --body <TEXT>
 ```
 
 ## Flags
@@ -31,12 +31,14 @@ gws gmail +draft --to <EMAILS> --subject <SUBJECT> --body <TEXT>
 | `--body` | yes | — | Email body (plain text) |
 | `--cc` | — | — | CC email address(es), comma-separated |
 | `--bcc` | — | — | BCC email address(es), comma-separated |
+| `--profile` | — | — | Account profile to use (see gws-shared for setup) |
 | `--dry-run` | — | — | Show the request that would be built without executing it |
 
 ## Examples
 
 ```bash
 gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi Alice!'
+gws gmail +draft --profile work --to alice@example.com --subject 'Hello' --body 'Hi!'
 gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi!' --cc bob@example.com
 gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi!' --bcc secret@example.com
 ```

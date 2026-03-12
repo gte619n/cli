@@ -91,7 +91,27 @@ const READONLY_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/tasks.readonly",
 ];
 
-pub fn config_dir() -> PathBuf {
+/// Global profile name. When set, credential and token paths resolve under
+/// `profiles/<name>/` within the config directory. Shared resources
+/// (client_secret.json, .encryption_key) remain at the root.
+static ACTIVE_PROFILE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// Set the active profile for this process. Must be called at most once,
+/// before any config_dir() / profile_dir() calls.
+pub fn set_active_profile(profile: Option<String>) {
+    let _ = ACTIVE_PROFILE.set(profile);
+}
+
+/// Returns the active profile name, if any.
+pub fn active_profile() -> Option<&'static str> {
+    ACTIVE_PROFILE
+        .get()
+        .and_then(|opt| opt.as_deref())
+}
+
+/// Returns the root config directory (never profile-scoped).
+/// Shared resources like client_secret.json and .encryption_key live here.
+pub fn config_root_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("GOOGLE_WORKSPACE_CLI_CONFIG_DIR") {
         return PathBuf::from(dir);
     }
@@ -117,6 +137,35 @@ pub fn config_dir() -> PathBuf {
     primary
 }
 
+/// Returns the config directory for the active profile.
+/// If a profile is set, returns `<root>/profiles/<name>/`.
+/// If no profile, returns the root config directory (backward compatible).
+pub fn config_dir() -> PathBuf {
+    let root = config_root_dir();
+    if let Some(profile) = active_profile() {
+        root.join("profiles").join(profile)
+    } else {
+        root
+    }
+}
+
+/// List all available profiles by scanning the profiles/ directory.
+pub fn list_profiles() -> Vec<String> {
+    let profiles_dir = config_root_dir().join("profiles");
+    let mut profiles = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&profiles_dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    profiles.push(name.to_string());
+                }
+            }
+        }
+    }
+    profiles.sort();
+    profiles
+}
+
 fn plain_credentials_path() -> PathBuf {
     if let Ok(path) = std::env::var("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE") {
         return PathBuf::from(path);
@@ -131,7 +180,7 @@ fn token_cache_path() -> PathBuf {
 /// Handle `gws auth <subcommand>`.
 pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
     const USAGE: &str = concat!(
-        "Usage: gws auth <login|setup|status|export|logout> [options]\n\n",
+        "Usage: gws auth <login|setup|status|export|logout|list> [options]\n\n",
         "  login    Authenticate via OAuth2 (opens browser)\n",
         "           --readonly       Request read-only scopes\n",
         "           --full           Request all scopes incl. pubsub + cloud-platform\n",
@@ -144,7 +193,11 @@ pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
         "           --login          Run `gws auth login` after successful setup\n",
         "  status   Show current authentication state\n",
         "  export   Print decrypted credentials to stdout\n",
-        "  logout   Clear saved credentials and token cache",
+        "  logout   Clear saved credentials and token cache\n",
+        "  list     List all configured profiles\n\n",
+        "Profile options (for login, status, export, logout):\n",
+        "  --profile <NAME>   Use a named profile (e.g. --profile personal)\n",
+        "                     Also reads GWS_PROFILE env var",
     );
 
     // Honour --help / -h before treating the first arg as a subcommand.
@@ -162,10 +215,42 @@ pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
             handle_export(unmasked).await
         }
         "logout" => handle_logout(),
+        "list" => handle_list_profiles(),
         other => Err(GwsError::Validation(format!(
-            "Unknown auth subcommand: '{other}'. Use: login, setup, status, export, logout"
+            "Unknown auth subcommand: '{other}'. Use: login, setup, status, export, logout, list"
         ))),
     }
+}
+
+/// Handle `gws auth list` — show all configured profiles.
+fn handle_list_profiles() -> Result<(), GwsError> {
+    let profiles = list_profiles();
+
+    // Also check if there are credentials at root (no-profile / legacy)
+    let root_has_creds = credential_store::encrypted_credentials_path().exists()
+        && active_profile().is_none();
+
+    if profiles.is_empty() && !root_has_creds {
+        println!("No profiles configured. Use `gws auth login --profile <name>` to create one.");
+        return Ok(());
+    }
+
+    let current = active_profile();
+    println!("Configured profiles:\n");
+
+    if root_has_creds && current.is_none() {
+        println!("  * (default)  [active]");
+    } else if root_has_creds {
+        println!("    (default)");
+    }
+
+    for name in &profiles {
+        let marker = if current == Some(name.as_str()) { "* " } else { "  " };
+        println!("  {marker}{name}");
+    }
+
+    println!("\nUse --profile <name> to select a profile, or set GWS_PROFILE env var.");
+    Ok(())
 }
 
 /// Run the `auth login` flow.
@@ -942,6 +1027,7 @@ async fn handle_status() -> Result<(), GwsError> {
     };
 
     let mut output = json!({
+        "profile": active_profile().unwrap_or("(default)"),
         "auth_method": auth_method,
         "storage": storage,
         "keyring_backend": credential_store::active_backend_name(),

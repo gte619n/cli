@@ -20,6 +20,8 @@ gws gmail <resource> <method> [flags]
 
 > **DRAFTS-ONLY MODE:** This is a modified fork that only creates drafts. No email sending is possible. All composition commands create drafts in your Gmail Drafts folder that must be reviewed and sent manually.
 
+> **MULTI-ACCOUNT:** Use `--profile <name>` to target a specific account (e.g. `--profile work`). See `gws-shared/SKILL.md` for profile setup.
+
 ## Helper Commands
 
 | Command | Description |

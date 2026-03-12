@@ -19,7 +19,7 @@ Draft a reply-all to a message (handles threading automatically). Creates a draf
 ## Usage
 
 ```bash
-gws gmail +reply-all --message-id <ID> --body <TEXT>
+gws gmail +reply-all [--profile <NAME>] --message-id <ID> --body <TEXT>
 ```
 
 ## Flags
@@ -57,4 +57,4 @@ gws gmail +reply-all --message-id 18f1a2b3c4d --body 'Reply' --bcc secret@exampl
 ## See Also
 
 - [gws-shared](../gws-shared/SKILL.md) — Global flags and auth
-- [gws-gmail](../gws-gmail/SKILL.md) — All send, read, and manage email commands
+- [gws-gmail](../gws-gmail/SKILL.md) — All draft, read, and manage email commands

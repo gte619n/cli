@@ -19,7 +19,7 @@ Draft a forwarded message to new recipients. Creates a draft in your Gmail Draft
 ## Usage
 
 ```bash
-gws gmail +forward --message-id <ID> --to <EMAILS>
+gws gmail +forward [--profile <NAME>] --message-id <ID> --to <EMAILS>
 ```
 
 ## Flags
@@ -50,4 +50,4 @@ gws gmail +forward --message-id 18f1a2b3c4d --to dave@example.com --bcc secret@e
 ## See Also
 
 - [gws-shared](../gws-shared/SKILL.md) — Global flags and auth
-- [gws-gmail](../gws-gmail/SKILL.md) — All send, read, and manage email commands
+- [gws-gmail](../gws-gmail/SKILL.md) — All draft, read, and manage email commands

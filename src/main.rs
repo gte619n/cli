@@ -56,6 +56,12 @@ async fn main() {
 async fn run() -> Result<(), GwsError> {
     let args: Vec<String> = std::env::args().collect();
 
+    // Parse --profile early (before any config_dir() calls).
+    // Priority: --profile flag > GWS_PROFILE env var
+    let profile = extract_profile_from_args(&args)
+        .or_else(|| std::env::var("GWS_PROFILE").ok().filter(|s| !s.is_empty()));
+    auth_commands::set_active_profile(profile);
+
     if args.len() < 2 {
         print_usage();
         return Err(GwsError::Validation(
@@ -64,7 +70,7 @@ async fn run() -> Result<(), GwsError> {
         ));
     }
 
-    // Find the first non-flag arg (skip --api-version and its value)
+    // Find the first non-flag arg (skip --api-version and --profile and their values)
     let mut first_arg: Option<String> = None;
     {
         let mut skip_next = false;
@@ -73,11 +79,11 @@ async fn run() -> Result<(), GwsError> {
                 skip_next = false;
                 continue;
             }
-            if a == "--api-version" {
+            if a == "--api-version" || a == "--profile" {
                 skip_next = true;
                 continue;
             }
-            if a.starts_with("--api-version=") {
+            if a.starts_with("--api-version=") || a.starts_with("--profile=") {
                 continue;
             }
             if !a.starts_with("--") || a.as_str() == "--help" || a.as_str() == "--version" {
@@ -126,9 +132,9 @@ async fn run() -> Result<(), GwsError> {
         return generate_skills::handle_generate_skills(&gen_args).await;
     }
 
-    // Handle the `auth` command
+    // Handle the `auth` command (strip --profile which was already consumed)
     if first_arg == "auth" {
-        let auth_args: Vec<String> = args.iter().skip(2).cloned().collect();
+        let auth_args: Vec<String> = strip_profile_from_args(&args.iter().skip(2).cloned().collect::<Vec<_>>());
         return auth_commands::handle_auth_command(&auth_args).await;
     }
 
@@ -341,11 +347,11 @@ pub fn filter_args_for_subcommand(args: &[String], service_name: &str) -> Vec<St
             skip_next = false;
             continue;
         }
-        if arg == "--api-version" {
+        if arg == "--api-version" || arg == "--profile" {
             skip_next = true;
             continue;
         }
-        if arg.starts_with("--api-version=") {
+        if arg.starts_with("--api-version=") || arg.starts_with("--profile=") {
             continue;
         }
         if !service_skipped && arg == service_name {
@@ -355,6 +361,41 @@ pub fn filter_args_for_subcommand(args: &[String], service_name: &str) -> Vec<St
         sub_args.push(arg.clone());
     }
     sub_args
+}
+
+/// Extract --profile value from args. Supports `--profile name` and `--profile=name`.
+fn extract_profile_from_args(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--profile" {
+            return iter.next().map(|s| s.to_string());
+        }
+        if let Some(value) = arg.strip_prefix("--profile=") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+/// Remove --profile and its value from an args list (already consumed globally).
+fn strip_profile_from_args(args: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut skip_next = false;
+    for arg in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if arg == "--profile" {
+            skip_next = true;
+            continue;
+        }
+        if arg.starts_with("--profile=") {
+            continue;
+        }
+        result.push(arg.clone());
+    }
+    result
 }
 
 fn parse_sanitize_config(

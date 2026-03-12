@@ -25,10 +25,38 @@ gws auth login
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 ```
 
+## Multi-Account Profiles
+
+Use `--profile` to switch between Google accounts:
+
+```bash
+# Login to different profiles
+gws auth login --profile personal    # e.g. evan.ruff@gmail.com
+gws auth login --profile work        # e.g. evan.ruff@oxos.com
+
+# Use a profile for any command
+gws gmail +draft --profile work --to alice@example.com --subject 'Hello' --body 'Hi!'
+gws gmail users messages list --profile personal --params '{"userId":"me"}'
+
+# Check which profile is active
+gws auth status --profile work
+
+# List all configured profiles
+gws auth list
+
+# Set a default profile via environment variable
+export GWS_PROFILE=work
+```
+
+- Without `--profile` or `GWS_PROFILE`, gws uses the default (root) credentials.
+- OAuth client config and encryption keys are shared across all profiles.
+- Each profile stores its own tokens and credentials under `~/.config/gws/profiles/<name>/`.
+
 ## Global Flags
 
 | Flag | Description |
 |------|-------------|
+| `--profile <NAME>` | Use a named account profile |
 | `--format <FORMAT>` | Output format: `json` (default), `table`, `yaml`, `csv` |
 | `--dry-run` | Validate locally without calling the API |
 | `--sanitize <TEMPLATE>` | Screen responses through Model Armor |
@@ -36,7 +64,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 ## CLI Syntax
 
 ```bash
-gws <service> <resource> [sub-resource] <method> [flags]
+gws [--profile <NAME>] <service> <resource> [sub-resource] <method> [flags]
 ```
 
 ### Method Flags
