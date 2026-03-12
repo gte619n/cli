@@ -1,7 +1,7 @@
 ---
 name: gws-gmail-reply-all
 version: 1.0.0
-description: "Gmail: Reply-all to a message (handles threading automatically)."
+description: "Gmail: Draft a reply-all to a message (handles threading automatically, drafts-only mode)."
 metadata:
   openclaw:
     category: "productivity"
@@ -14,7 +14,7 @@ metadata:
 
 > **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.
 
-Reply-all to a message (handles threading automatically)
+Draft a reply-all to a message (handles threading automatically). Creates a draft in your Gmail Drafts folder — you must manually send from Gmail.
 
 ## Usage
 

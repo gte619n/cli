@@ -37,7 +37,10 @@ use std::pin::Pin;
 
 pub struct GmailHelper;
 
-pub(super) const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
+// DRAFTS-ONLY: Downgraded from gmail.modify to gmail.compose (draft creation only).
+// The gmail.compose scope allows creating drafts but Google's API will reject
+// any attempt to call users.messages.send with this scope.
+pub(super) const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.compose";
 pub(super) const GMAIL_READONLY_SCOPE: &str = "https://www.googleapis.com/auth/gmail.readonly";
 pub(super) const PUBSUB_SCOPE: &str = "https://www.googleapis.com/auth/pubsub";
 
@@ -355,54 +358,61 @@ pub(super) fn parse_optional_trimmed(matches: &ArgMatches, name: &str) -> Option
         .filter(|s| !s.is_empty())
 }
 
-pub(super) fn resolve_send_method(
+// DRAFTS-ONLY: resolve_send_method intentionally removed.
+// All email composition now goes through create_draft_email() below.
+
+/// Resolve the `users.drafts.create` method from the Discovery Document.
+pub(super) fn resolve_draft_create_method(
     doc: &crate::discovery::RestDescription,
 ) -> Result<&crate::discovery::RestMethod, GwsError> {
     let users_res = doc
         .resources
         .get("users")
         .ok_or_else(|| GwsError::Discovery("Resource 'users' not found".to_string()))?;
-    let messages_res = users_res
+    let drafts_res = users_res
         .resources
-        .get("messages")
-        .ok_or_else(|| GwsError::Discovery("Resource 'users.messages' not found".to_string()))?;
-    messages_res
+        .get("drafts")
+        .ok_or_else(|| GwsError::Discovery("Resource 'users.drafts' not found".to_string()))?;
+    drafts_res
         .methods
-        .get("send")
-        .ok_or_else(|| GwsError::Discovery("Method 'users.messages.send' not found".to_string()))
+        .get("create")
+        .ok_or_else(|| GwsError::Discovery("Method 'users.drafts.create' not found".to_string()))
 }
 
-/// Build the JSON request body for `users.messages.send`, base64-encoding
+/// Build the JSON request body for `users.drafts.create`, base64-encoding
 /// the raw RFC 2822 message and optionally including a threadId.
-pub(super) fn build_raw_send_body(raw_message: &str, thread_id: Option<&str>) -> Value {
-    let mut body =
+pub(super) fn build_draft_body(raw_message: &str, thread_id: Option<&str>) -> Value {
+    let mut message =
         serde_json::Map::from_iter([("raw".to_string(), json!(URL_SAFE.encode(raw_message)))]);
 
     if let Some(thread_id) = thread_id {
-        body.insert("threadId".to_string(), json!(thread_id));
+        message.insert("threadId".to_string(), json!(thread_id));
     }
 
-    Value::Object(body)
+    // The drafts.create API expects { "message": { "raw": "...", "threadId": "..." } }
+    json!({ "message": Value::Object(message) })
 }
 
-pub(super) async fn send_raw_email(
+/// DRAFTS-ONLY: Create a draft instead of sending. This replaces the original
+/// `send_raw_email` function. All helpers route through here.
+pub(super) async fn create_draft_email(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
     raw_message: &str,
     thread_id: Option<&str>,
     existing_token: Option<&str>,
 ) -> Result<(), GwsError> {
-    let body = build_raw_send_body(raw_message, thread_id);
+    let body = build_draft_body(raw_message, thread_id);
     let body_str = body.to_string();
 
-    let send_method = resolve_send_method(doc)?;
+    let draft_method = resolve_draft_create_method(doc)?;
     let params = json!({ "userId": "me" });
     let params_str = params.to_string();
 
     let (token, auth_method) = match existing_token {
         Some(t) => (Some(t.to_string()), executor::AuthMethod::OAuth),
         None => {
-            let scopes: Vec<&str> = send_method.scopes.iter().map(|s| s.as_str()).collect();
+            let scopes: Vec<&str> = draft_method.scopes.iter().map(|s| s.as_str()).collect();
             match auth::get_token(&scopes).await {
                 Ok(t) => (Some(t), executor::AuthMethod::OAuth),
                 Err(_) if matches.get_flag("dry-run") => (None, executor::AuthMethod::None),
@@ -419,7 +429,7 @@ pub(super) async fn send_raw_email(
 
     executor::execute_method(
         doc,
-        send_method,
+        draft_method,
         Some(&params_str),
         Some(&body_str),
         token.as_deref(),
@@ -435,6 +445,8 @@ pub(super) async fn send_raw_email(
     )
     .await?;
 
+    eprintln!("[drafts-only] Draft created successfully. Review and send from Gmail.");
+
     Ok(())
 }
 
@@ -445,9 +457,10 @@ impl Helper for GmailHelper {
         mut cmd: Command,
         _doc: &crate::discovery::RestDescription,
     ) -> Command {
+        // DRAFTS-ONLY: +send removed. Replaced with +draft.
         cmd = cmd.subcommand(
-            Command::new("+send")
-                .about("[Helper] Send an email")
+            Command::new("+draft")
+                .about("[Helper] Create an email draft (drafts-only mode)")
                 .arg(
                     Arg::new("to")
                         .long("to")
@@ -484,19 +497,19 @@ impl Helper for GmailHelper {
                 .arg(
                     Arg::new("dry-run")
                         .long("dry-run")
-                        .help("Show the request that would be sent without executing it")
+                        .help("Show the request that would be built without executing it")
                         .action(ArgAction::SetTrue),
                 )
                 .after_help(
                     "\
 EXAMPLES:
-  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi Alice!'
-  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi!' --cc bob@example.com
-  gws gmail +send --to alice@example.com --subject 'Hello' --body 'Hi!' --bcc secret@example.com
+  gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi Alice!'
+  gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi!' --cc bob@example.com
+  gws gmail +draft --to alice@example.com --subject 'Hello' --body 'Hi!' --bcc secret@example.com
 
 TIPS:
-  Handles RFC 2822 formatting and base64 encoding automatically.
-  For HTML bodies or attachments, use the raw API instead: gws gmail users messages send --json '...'",
+  Creates a draft in your Gmail Drafts folder. You must manually send from Gmail.
+  Handles RFC 2822 formatting and base64 encoding automatically.",
                 ),
         );
 
@@ -538,7 +551,7 @@ TIPS:
 
         cmd = cmd.subcommand(
             Command::new("+reply")
-                .about("[Helper] Reply to a message (handles threading automatically)")
+                .about("[Helper] Draft a reply to a message (handles threading automatically)")
                 .arg(
                     Arg::new("message-id")
                         .long("message-id")
@@ -601,7 +614,7 @@ TIPS:
 
         cmd = cmd.subcommand(
             Command::new("+reply-all")
-                .about("[Helper] Reply-all to a message (handles threading automatically)")
+                .about("[Helper] Draft a reply-all to a message (handles threading automatically)")
                 .arg(
                     Arg::new("message-id")
                         .long("message-id")
@@ -673,7 +686,7 @@ TIPS:
 
         cmd = cmd.subcommand(
             Command::new("+forward")
-                .about("[Helper] Forward a message to new recipients")
+                .about("[Helper] Draft a forwarded message to new recipients")
                 .arg(
                     Arg::new("message-id")
                         .long("message-id")
@@ -823,7 +836,8 @@ TIPS:
         sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
-            if let Some(matches) = matches.subcommand_matches("+send") {
+            // DRAFTS-ONLY: +send removed, replaced with +draft
+            if let Some(matches) = matches.subcommand_matches("+draft") {
                 handle_send(doc, matches).await?;
                 return Ok(true);
             }
@@ -869,30 +883,38 @@ mod tests {
         let cmd = Command::new("test");
         let doc = crate::discovery::RestDescription::default();
 
-        // No scopes granted -> defaults to showing all
         let cmd = helper.inject_commands(cmd, &doc);
         let subcommands: Vec<_> = cmd.get_subcommands().map(|s| s.get_name()).collect();
         assert!(subcommands.contains(&"+watch"));
-        assert!(subcommands.contains(&"+send"));
+        // DRAFTS-ONLY: +send replaced with +draft
+        assert!(subcommands.contains(&"+draft"));
+        assert!(!subcommands.contains(&"+send"), "+send must not exist in drafts-only mode");
         assert!(subcommands.contains(&"+reply"));
         assert!(subcommands.contains(&"+reply-all"));
         assert!(subcommands.contains(&"+forward"));
     }
 
     #[test]
-    fn test_build_raw_send_body_with_thread_id() {
-        let body = build_raw_send_body("raw message", Some("thread-123"));
+    fn test_build_draft_body_with_thread_id() {
+        let body = build_draft_body("raw message", Some("thread-123"));
 
-        assert_eq!(body["raw"], URL_SAFE.encode("raw message"));
-        assert_eq!(body["threadId"], "thread-123");
+        assert_eq!(body["message"]["raw"], URL_SAFE.encode("raw message"));
+        assert_eq!(body["message"]["threadId"], "thread-123");
     }
 
     #[test]
-    fn test_build_raw_send_body_without_thread_id() {
-        let body = build_raw_send_body("raw message", None);
+    fn test_build_draft_body_without_thread_id() {
+        let body = build_draft_body("raw message", None);
 
-        assert_eq!(body["raw"], URL_SAFE.encode("raw message"));
-        assert!(body.get("threadId").is_none());
+        assert_eq!(body["message"]["raw"], URL_SAFE.encode("raw message"));
+        assert!(body["message"].get("threadId").is_none());
+    }
+
+    #[test]
+    fn test_gmail_scope_is_compose_not_modify() {
+        // DRAFTS-ONLY: Verify the scope is restricted to compose
+        assert_eq!(GMAIL_SCOPE, "https://www.googleapis.com/auth/gmail.compose");
+        assert!(!GMAIL_SCOPE.contains("modify"), "gmail.modify scope must not be used");
     }
 
     #[test]
@@ -1131,25 +1153,25 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_send_method_finds_gmail_send_method() {
+    fn test_resolve_draft_create_method_finds_gmail_drafts_create() {
         let mut doc = crate::discovery::RestDescription::default();
-        let send_method = crate::discovery::RestMethod {
+        let create_method = crate::discovery::RestMethod {
             http_method: "POST".to_string(),
-            path: "gmail/v1/users/{userId}/messages/send".to_string(),
+            path: "gmail/v1/users/{userId}/drafts".to_string(),
             ..Default::default()
         };
 
-        let mut messages = crate::discovery::RestResource::default();
-        messages.methods.insert("send".to_string(), send_method);
+        let mut drafts = crate::discovery::RestResource::default();
+        drafts.methods.insert("create".to_string(), create_method);
 
         let mut users = crate::discovery::RestResource::default();
-        users.resources.insert("messages".to_string(), messages);
+        users.resources.insert("drafts".to_string(), drafts);
 
         doc.resources = HashMap::from([("users".to_string(), users)]);
 
-        let resolved = resolve_send_method(&doc).unwrap();
+        let resolved = resolve_draft_create_method(&doc).unwrap();
 
         assert_eq!(resolved.http_method, "POST");
-        assert_eq!(resolved.path, "gmail/v1/users/{userId}/messages/send");
+        assert_eq!(resolved.path, "gmail/v1/users/{userId}/drafts");
     }
 }

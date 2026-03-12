@@ -204,6 +204,27 @@ async fn run() -> Result<(), GwsError> {
     // Walk the subcommand tree to find the target method
     let (method, matched_args) = resolve_method_from_matches(&doc, &matches)?;
 
+    // DRAFTS-ONLY: Runtime guard — block any method whose path resolves to messages/send
+    // or drafts/send, even if something bypasses the command tree filter.
+    if doc.name == "gmail" {
+        if let Some(ref path) = method.flat_path {
+            if path.contains("messages/send") || path.contains("drafts/send") {
+                return Err(GwsError::Validation(
+                    "[drafts-only] Sending emails is disabled. All composition creates drafts only. \
+                     Review and send manually from Gmail."
+                        .to_string(),
+                ));
+            }
+        }
+        if method.path.contains("messages/send") || method.path.contains("drafts/send") {
+            return Err(GwsError::Validation(
+                "[drafts-only] Sending emails is disabled. All composition creates drafts only. \
+                 Review and send manually from Gmail."
+                    .to_string(),
+            ));
+        }
+    }
+
     let params_json = matched_args.get_one::<String>("params").map(|s| s.as_str());
     let body_json = matched_args
         .try_get_one::<String>("json")

@@ -1,7 +1,7 @@
 ---
 name: gws-gmail-forward
 version: 1.0.0
-description: "Gmail: Forward a message to new recipients."
+description: "Gmail: Draft a forwarded message to new recipients (drafts-only mode)."
 metadata:
   openclaw:
     category: "productivity"
@@ -14,7 +14,7 @@ metadata:
 
 > **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.
 
-Forward a message to new recipients
+Draft a forwarded message to new recipients. Creates a draft in your Gmail Drafts folder — you must manually send from Gmail.
 
 ## Usage
 

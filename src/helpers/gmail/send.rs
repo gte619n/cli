@@ -1,5 +1,7 @@
 use super::*;
 
+/// DRAFTS-ONLY: Creates a draft instead of sending. The function name is kept
+/// as handle_send for minimal diff with upstream, but it routes to create_draft_email.
 pub(super) async fn handle_send(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
@@ -16,7 +18,7 @@ pub(super) async fn handle_send(
     }
     .build(&config.body_text);
 
-    super::send_raw_email(doc, matches, &raw, None, None).await
+    super::create_draft_email(doc, matches, &raw, None, None).await
 }
 
 pub(super) struct SendConfig {

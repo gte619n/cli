@@ -1,7 +1,7 @@
 ---
 name: gws-gmail
 version: 1.0.0
-description: "Gmail: Send, read, and manage email."
+description: "Gmail: Draft, read, and manage email (drafts-only mode — no sending)."
 metadata:
   openclaw:
     category: "productivity"
@@ -18,15 +18,17 @@ metadata:
 gws gmail <resource> <method> [flags]
 ```
 
+> **DRAFTS-ONLY MODE:** This is a modified fork that only creates drafts. No email sending is possible. All composition commands create drafts in your Gmail Drafts folder that must be reviewed and sent manually.
+
 ## Helper Commands
 
 | Command | Description |
 |---------|-------------|
-| [`+send`](../gws-gmail-send/SKILL.md) | Send an email |
+| [`+draft`](../gws-gmail-draft/SKILL.md) | Create an email draft |
 | [`+triage`](../gws-gmail-triage/SKILL.md) | Show unread inbox summary (sender, subject, date) |
-| [`+reply`](../gws-gmail-reply/SKILL.md) | Reply to a message (handles threading automatically) |
-| [`+reply-all`](../gws-gmail-reply-all/SKILL.md) | Reply-all to a message (handles threading automatically) |
-| [`+forward`](../gws-gmail-forward/SKILL.md) | Forward a message to new recipients |
+| [`+reply`](../gws-gmail-reply/SKILL.md) | Draft a reply to a message (handles threading automatically) |
+| [`+reply-all`](../gws-gmail-reply-all/SKILL.md) | Draft a reply-all to a message (handles threading automatically) |
+| [`+forward`](../gws-gmail-forward/SKILL.md) | Draft a forwarded message to new recipients |
 | [`+watch`](../gws-gmail-watch/SKILL.md) | Watch for new emails and stream them as NDJSON |
 
 ## API Resources

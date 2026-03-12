@@ -97,7 +97,8 @@ pub(super) async fn handle_reply(
     let raw = create_reply_raw_message(&envelope, &original);
 
     let auth_token = token.as_ref().map(|(t, _)| t.as_str());
-    super::send_raw_email(doc, matches, &raw, Some(&original.thread_id), auth_token).await
+    // DRAFTS-ONLY: create draft instead of sending
+    super::create_draft_email(doc, matches, &raw, Some(&original.thread_id), auth_token).await
 }
 
 // --- Data structures ---

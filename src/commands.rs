@@ -61,7 +61,8 @@ pub fn build_cli(doc: &RestDescription) -> Command {
         resource_names.sort();
         for name in resource_names {
             let resource = &doc.resources[name];
-            if let Some(cmd) = build_resource_command(name, resource) {
+            // DRAFTS-ONLY: Pass service name to filter blocked methods
+            if let Some(cmd) = build_resource_command(name, resource, &doc.name, name) {
                 root = root.subcommand(cmd);
             }
         }
@@ -70,9 +71,26 @@ pub fn build_cli(doc: &RestDescription) -> Command {
     root
 }
 
+/// DRAFTS-ONLY: Methods blocked from the Gmail service discovery tree.
+/// This prevents agents from using raw API paths to send emails.
+fn is_blocked_gmail_method(service: &str, resource_path: &str, method_name: &str) -> bool {
+    if service != "gmail" {
+        return false;
+    }
+    // Block users.messages.send — the only way to send email directly
+    if resource_path == "messages" && method_name == "send" {
+        return true;
+    }
+    // Block users.drafts.send — converts a draft to a sent message
+    if resource_path == "drafts" && method_name == "send" {
+        return true;
+    }
+    false
+}
+
 /// Recursively builds a Command for a resource.
 /// Returns None if the resource has no methods or sub-resources.
-fn build_resource_command(name: &str, resource: &RestResource) -> Option<Command> {
+fn build_resource_command(name: &str, resource: &RestResource, service: &str, resource_path: &str) -> Option<Command> {
     let mut cmd = Command::new(name.to_string())
         .about(format!("Operations on the '{name}' resource"))
         .subcommand_required(true)
@@ -84,6 +102,11 @@ fn build_resource_command(name: &str, resource: &RestResource) -> Option<Command
     let mut method_names: Vec<_> = resource.methods.keys().collect();
     method_names.sort();
     for method_name in method_names {
+        // DRAFTS-ONLY: Skip blocked methods
+        if is_blocked_gmail_method(service, resource_path, method_name) {
+            continue;
+        }
+
         let method = &resource.methods[method_name];
 
         has_children = true;
@@ -161,7 +184,8 @@ fn build_resource_command(name: &str, resource: &RestResource) -> Option<Command
     sub_names.sort();
     for sub_name in sub_names {
         let sub_resource = &resource.resources[sub_name];
-        if let Some(sub_cmd) = build_resource_command(sub_name, sub_resource) {
+        // DRAFTS-ONLY: Pass service and sub-resource name for filtering
+        if let Some(sub_cmd) = build_resource_command(sub_name, sub_resource, service, sub_name) {
             has_children = true;
             cmd = cmd.subcommand(sub_cmd);
         }

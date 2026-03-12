@@ -47,7 +47,8 @@ pub(super) async fn handle_forward(
     };
     let raw = create_forward_raw_message(&envelope, &original);
 
-    super::send_raw_email(
+    // DRAFTS-ONLY: create draft instead of sending
+    super::create_draft_email(
         doc,
         matches,
         &raw,
