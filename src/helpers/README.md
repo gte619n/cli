@@ -39,7 +39,7 @@ pub trait Helper: Send + Sync {
 
 | Service | Command | Usage | Description | Equivalent Raw Command (Example) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Gmail** | `+send` | `gws gmail +send ...` | Sends an email. | `gws gmail users messages send ...` |
+| **Gmail** | `+draft` | `gws gmail +draft ...` | Creates an email draft. | `gws gmail users drafts create ...` |
 | **Sheets** | `+append` | `gws sheets +append ...` | Appends a row. | `gws sheets spreadsheets values append ...` |
 | **Sheets** | `+read` | `gws sheets +read ...` | Reads values. | `gws sheets spreadsheets values get ...` |
 | **Docs** | `+write` | `gws docs +write ...` | Appends text. | `gws docs documents batchUpdate ...` |
@@ -60,7 +60,7 @@ To add a new helper:
 
 ## Current Helpers
 
-*   **Gmail**: Sending emails (abstracts RFC 2822 encoding).
+*   **Gmail**: Creating email drafts (abstracts RFC 2822 encoding). Sending is disabled in this fork.
 *   **Sheets**: Appending rows (abstracts `ValueRange` JSON construction).
 *   **Docs**: Appending text (abstracts `batchUpdate` requests).
 *   **Chat**: Sending messages to spaces.

@@ -451,7 +451,7 @@ pub(super) async fn create_draft_email(
 }
 
 impl Helper for GmailHelper {
-    /// Injects helper subcommands (`+send`, `+watch`) into the main CLI command.
+    /// Injects helper subcommands (`+draft`, `+reply`, `+forward`, `+triage`, `+watch`) into the main CLI command.
     fn inject_commands(
         &self,
         mut cmd: Command,
