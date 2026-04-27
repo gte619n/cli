@@ -47,10 +47,12 @@ pub const MINIMAL_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/tasks",
+    "https://www.googleapis.com/auth/contacts",
 ];
 
 /// Default scopes for login.  Alias for [`MINIMAL_SCOPES`] — deliberately kept
@@ -72,10 +74,12 @@ pub const FULL_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/tasks",
+    "https://www.googleapis.com/auth/contacts",
     "https://www.googleapis.com/auth/pubsub",
     "https://www.googleapis.com/auth/cloud-platform",
 ];
@@ -89,6 +93,7 @@ const READONLY_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/documents.readonly",
     "https://www.googleapis.com/auth/presentations.readonly",
     "https://www.googleapis.com/auth/tasks.readonly",
+    "https://www.googleapis.com/auth/contacts.readonly",
 ];
 
 /// Global profile name. When set, credential and token paths resolve under
@@ -1349,6 +1354,10 @@ const SCOPE_ENTRIES: &[ScopeEntry] = &[
         label: "Gmail",
     },
     ScopeEntry {
+        scope: "https://www.googleapis.com/auth/gmail.settings.basic",
+        label: "Gmail Settings (filters, vacation responder)",
+    },
+    ScopeEntry {
         scope: "https://www.googleapis.com/auth/calendar",
         label: "Google Calendar",
     },
@@ -1363,6 +1372,10 @@ const SCOPE_ENTRIES: &[ScopeEntry] = &[
     ScopeEntry {
         scope: "https://www.googleapis.com/auth/tasks",
         label: "Google Tasks",
+    },
+    ScopeEntry {
+        scope: "https://www.googleapis.com/auth/contacts",
+        label: "Google Contacts",
     },
     ScopeEntry {
         scope: "https://www.googleapis.com/auth/pubsub",
